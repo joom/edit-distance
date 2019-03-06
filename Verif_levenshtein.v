@@ -29,73 +29,156 @@ Definition on_string (f : lstring -> lstring) (s : string) : string :=
   to_string (f (to_lstring s)).
 Definition on_lstring (f : string -> string) (l : lstring) : lstring :=
   to_lstring (f (to_string l)).
-
 End Isomorphism.
 
 Open Scope list_scope.
 Import ListNotations.
 
-Definition insert (i : nat) (c : ascii) (s : lstring) : lstring :=
-  firstn i s ++ [c] ++ skipn i s.
-Definition delete (i : nat) (s : lstring) : lstring :=
-  firstn i s ++ skipn (S i) s.
-Definition update (i : nat) (c : ascii) (s : lstring) : lstring :=
-  firstn i s ++ [c] ++ skipn (S i) s.
-
-Eval compute in (on_string (insert 1 "!") "joomy").
-Eval compute in (on_string (delete 1) "joomy").
-Eval compute in (on_string (update 0 "J") "joomy").
-
 Inductive edit : lstring -> lstring -> Type :=
-| insertion (i : nat) (c : ascii) (s : lstring) : edit s (insert i c s)
-| deletion (i : nat) (s : lstring) : edit s (delete i s)
-| substitution (i : nat) (c : ascii) (s : lstring) : edit s (update i c s).
+| insertion (a : ascii) {s : lstring} : edit s (a :: s)
+| deletion (a : ascii) {s : lstring} : edit (a :: s) s
+| update (a' : ascii) (a : ascii) {s : lstring} : edit (a' :: s) (a :: s).
 
 Inductive chain : lstring -> lstring -> Type :=
-| same : forall s, chain s s
-| change : forall s s' t, edit s s' -> chain s' t -> chain s t.
+| empty : chain [] []
+| skip {a : ascii} {s t : lstring} : chain s t -> chain (a :: s) (a :: t)
+| change {s t u : lstring} : edit s t -> chain t u -> chain s u.
 
-Fixpoint chain_length {s t : lstring} (c : chain s t) : nat :=
+Fixpoint chain_changes {s t : lstring} (c : chain s t) : nat :=
   match c with
-  | same _ => 0
-  | change _ _ _ _ c' => chain_length c'
+  | empty => 0
+  | skip c' => chain_changes c'
+  | change _ c' => S (chain_changes c')
   end.
 
-Lemma weaken_edit (a : ascii) (s1 s2 : lstring) (e : edit s1 s2) : edit (cons a s1) (cons a s2).
-inversion e.
-* pose (insertion (S i) c (cons a s1)). auto.
-* pose (deletion (S i) (cons a s1)). auto.
-* pose (substitution (S i) c (cons a s1)). auto.
-Qed.
+Lemma same_chain : forall s, chain s s.
+intros s. induction s; constructor. auto.
+Defined.
 
-Lemma insert_chain : forall c s1 s2, chain s1 s2 -> chain s1 (cons c s2).
-intros.
-apply (change _ (cons c s1)).
-pose (insertion 0 c s1) as e.
-auto.
-induction H.
+Lemma ch1 : chain (to_lstring "h") (to_lstring "ah").
+simpl.
+apply (@change _ ["a"%char;"h"%char]).
 constructor.
-pose (weaken_edit c s s' e) as e'.
-apply (change _ _ _ e' IHchain).
-Qed.
+apply same_chain.
+Defined.
+Eval compute in ch1.
+
+Lemma insert_chain : forall c s1 s2, chain s1 s2 -> chain s1 (c :: s2).
+intros c s1 s2 C.
+apply (@change _ (c :: s1)); constructor. auto.
+Defined.
 
 Lemma inserts_chain : forall s1 s2, chain s2 (s1 ++ s2).
 intros.
 induction s1; simpl.
-constructor.
-apply insert_chain.
-auto.
-Qed.
+induction s2; constructor; auto.
+apply insert_chain; auto.
+Defined.
 
-Lemma delete_chain : forall c s, chain (cons c s) s.
+(* transparent version of app_nil_r *)
+Lemma tr_app_nil_r : forall {A : Type} (l : list A), l ++ [] = l.
+intros A l; induction l. auto. simpl; rewrite IHl; auto.
+Defined.
+
+Lemma inserts_chain_nil : forall s, chain [] s.
+intros s; pose (inserts_chain s nil); rewrite (tr_app_nil_r s) in *; auto.
+Defined.
+
+Lemma delete_chain : forall c s1 s2, chain s1 s2 -> chain (c :: s1) s2.
+intros c s1 s2 C.
+apply (@change _ s1). constructor. auto.
+Defined.
+
+Lemma deletes_chain : forall s1 s2, chain (s1 ++ s2) s2.
 intros.
-apply (change _ s).
-pose (deletion 0 (cons c s)) as e.
-unfold delete in *.
-simpl in e.
+induction s1; simpl.
+apply same_chain.
+apply delete_chain.
 auto.
-constructor.
-Qed.
+Defined.
 
-Fixpoint levenshtein_chain (s t : lstring) : chain s t.
-Admitted.
+Lemma deletes_chain_nil : forall s, chain s [].
+intros s; pose (deletes_chain s nil); rewrite (tr_app_nil_r s) in *; auto.
+Defined.
+
+Lemma update_chain : forall c c' s1 s2, chain s1 s2 -> chain (c :: s1) (c' :: s2).
+intros c c' s1 s2 C.
+apply (@change _ (c' :: s1)). constructor. apply skip. auto.
+Defined.
+
+(* These aux lemmas are needed because Coq wants to use the fixpoint
+   we are defining as a higher order function otherwise. *)
+Lemma aux1 : forall s t x xs y ys, s = x :: xs -> t = y :: ys -> chain s ys -> chain s t.
+intros s t x xs y ys eq1 eq2 r1. subst. apply (insert_chain y (x :: xs) ys r1).
+Defined.
+
+Lemma aux2 : forall s t x xs y ys,
+    s = x :: xs -> t = y :: ys -> x = y -> chain xs ys -> chain s t.
+intros s t x xs y ys eq1 eq2 ceq C.
+subst. apply skip. auto.
+Defined.
+
+Fixpoint levenshtein_chain (s : lstring) :=
+  fix levenshtein_chain1 (t : lstring) : chain s t :=
+    (match s as s', t as t' return s = s' -> t = t' -> chain s t with
+    | nil , _ =>
+        fun eq1 eq2 =>
+          ltac:(rewrite eq1; apply (inserts_chain_nil t))
+    | cons y ys , nil =>
+        fun eq1 eq2 =>
+          ltac:(rewrite eq1; rewrite eq2; apply (deletes_chain_nil (y :: ys)))
+    | cons x xs, cons y ys =>
+      fun eq1 eq2 =>
+        match ascii_dec x y with
+        | left ceq =>
+          aux2 s t x xs y ys eq1 eq2 ceq (levenshtein_chain xs ys)
+        | right neq =>
+            let r1 := levenshtein_chain1 ys in
+            let r2 := levenshtein_chain xs (y :: ys) in
+            let r3 := levenshtein_chain xs ys in
+            let n1 := chain_changes r1 in
+            let n2 := chain_changes r2 in
+            let n3 := chain_changes r3 in
+            match (Nat.leb n1 n2) return chain s t with
+            | true => aux1 s t x xs y ys eq1 eq2 r1
+            | false =>
+              match (Nat.leb n2 n3) with
+              | true =>
+                ltac:(rewrite eq1; rewrite eq2; apply (delete_chain x _ _ r2))
+              | false =>
+                ltac:(rewrite eq1; rewrite eq2; apply (update_chain x y xs ys r3))
+              end
+            end
+        end
+    end) (eq_refl s) (eq_refl t).
+
+Eval compute in (levenshtein_chain (to_lstring "joomy") (to_lstring "Joomy")).
+Eval compute in (chain_changes (levenshtein_chain (to_lstring "joomy") (to_lstring "Joomy"))).
+
+(* still buggy about updates *)
+
+(* My original intent was to write it using Ltac but then
+   there are multiple decreasing arguments. *)
+(*
+Fixpoint levenshtein_chain (s : lstring) (t : lstring) : chain s t.
+induction s as [| x xs].
+apply inserts_chain_nil.
+induction t as [| y ys].
+apply deletes_chain_nil.
+pose (levenshtein_chain ((x :: xs), ys)) as r1.
+pose (levenshtein_chain (xs, (y :: ys))) as r2.
+pose (levenshtein_chain (xs, ys)) as r3.
+pose (chain_changes r1) as n1.
+pose (chain_changes r2) as n2.
+pose (chain_changes r3) as n3.
+destruct (Nat.leb n1 n2) eqn: comp.
+* (* n1 <= n2 *)
+  apply (insert_chain _ _ _ r1).
+* (* n1 > n2 *)
+  destruct (Nat.leb n2 n3) eqn: comp2.
+  - (* n2 <= n3 *)
+    apply (delete_chain _ _ _ r2).
+  - (* n2 > n3 *)
+    apply (insert_chain y (x :: xs) ys (delete_chain x xs ys r3)).
+Defined.
+*)
