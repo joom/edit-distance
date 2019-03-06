@@ -108,77 +108,55 @@ Defined.
 
 (* These aux lemmas are needed because Coq wants to use the fixpoint
    we are defining as a higher order function otherwise. *)
-Lemma aux1 : forall s t x xs y ys, s = x :: xs -> t = y :: ys -> chain s ys -> chain s t.
+Lemma aux_insert : forall s t x xs y ys, s = x :: xs -> t = y :: ys -> chain s ys -> chain s t.
 intros s t x xs y ys eq1 eq2 r1. subst. apply (insert_chain y (x :: xs) ys r1).
 Defined.
 
-Lemma aux2 : forall s t x xs y ys,
+Lemma aux_eq_char : forall s t x xs y ys,
     s = x :: xs -> t = y :: ys -> x = y -> chain xs ys -> chain s t.
 intros s t x xs y ys eq1 eq2 ceq C.
 subst. apply skip. auto.
 Defined.
 
+Lemma aux_both_empty : forall s t, s = [] -> t = [] -> chain s t.
+intros s t eq1 eq2. subst. constructor.
+Defined.
+
+Definition min_app {t : Type} (x y z : t) (f : t -> nat) : t :=
+  let n1 := f x in let n2 := f y in let n3 := f z in
+  match (Nat.leb n1 n2) with
+  | true => match (Nat.leb n1 n3) with | true => x | false => z end
+  | false => match (Nat.leb n2 n3) with | true => y | false => z end
+  end.
+
 Fixpoint levenshtein_chain (s : lstring) :=
   fix levenshtein_chain1 (t : lstring) : chain s t :=
     (match s as s', t as t' return s = s' -> t = t' -> chain s t with
+    | nil , nil => (* redundant but whatever *)
+        fun eq1 eq2 => aux_both_empty s t eq1 eq2
     | nil , _ =>
         fun eq1 eq2 =>
           ltac:(rewrite eq1; apply (inserts_chain_nil t))
     | cons y ys , nil =>
         fun eq1 eq2 =>
-          ltac:(rewrite eq1; rewrite eq2; apply (deletes_chain_nil (y :: ys)))
+          ltac:(rewrite eq1, eq2; apply (deletes_chain_nil (y :: ys)))
     | cons x xs, cons y ys =>
       fun eq1 eq2 =>
         match ascii_dec x y with
-        | left ceq =>
-          aux2 s t x xs y ys eq1 eq2 ceq (levenshtein_chain xs ys)
+        | left ceq => aux_eq_char s t x xs y ys eq1 eq2 ceq (levenshtein_chain xs ys)
         | right neq =>
             let r1 := levenshtein_chain1 ys in
             let r2 := levenshtein_chain xs (y :: ys) in
             let r3 := levenshtein_chain xs ys in
-            let n1 := chain_changes r1 in
-            let n2 := chain_changes r2 in
-            let n3 := chain_changes r3 in
-            match (Nat.leb n1 n2) return chain s t with
-            | true => aux1 s t x xs y ys eq1 eq2 r1
-            | false =>
-              match (Nat.leb n2 n3) with
-              | true =>
-                ltac:(rewrite eq1; rewrite eq2; apply (delete_chain x _ _ r2))
-              | false =>
-                ltac:(rewrite eq1; rewrite eq2; apply (update_chain x y xs ys r3))
-              end
-            end
+            let r1' : chain s t :=
+                aux_insert s t x xs y ys eq1 eq2 r1 in
+            let r2' : chain s t :=
+                ltac:(rewrite eq1, eq2; apply (delete_chain x xs (y :: ys) r2)) in
+            let r3' : chain s t :=
+                ltac:(rewrite eq1, eq2; apply (update_chain x y xs ys r3)) in
+            min_app r1' r2' r3' chain_changes
         end
     end) (eq_refl s) (eq_refl t).
 
-Eval compute in (levenshtein_chain (to_lstring "joomy") (to_lstring "Joomy")).
+Eval compute in (levenshtein_chain (to_lstring "x") (to_lstring "X")).
 Eval compute in (chain_changes (levenshtein_chain (to_lstring "joomy") (to_lstring "Joomy"))).
-
-(* still buggy about updates *)
-
-(* My original intent was to write it using Ltac but then
-   there are multiple decreasing arguments. *)
-(*
-Fixpoint levenshtein_chain (s : lstring) (t : lstring) : chain s t.
-induction s as [| x xs].
-apply inserts_chain_nil.
-induction t as [| y ys].
-apply deletes_chain_nil.
-pose (levenshtein_chain ((x :: xs), ys)) as r1.
-pose (levenshtein_chain (xs, (y :: ys))) as r2.
-pose (levenshtein_chain (xs, ys)) as r3.
-pose (chain_changes r1) as n1.
-pose (chain_changes r2) as n2.
-pose (chain_changes r3) as n3.
-destruct (Nat.leb n1 n2) eqn: comp.
-* (* n1 <= n2 *)
-  apply (insert_chain _ _ _ r1).
-* (* n1 > n2 *)
-  destruct (Nat.leb n2 n3) eqn: comp2.
-  - (* n2 <= n3 *)
-    apply (delete_chain _ _ _ r2).
-  - (* n2 > n3 *)
-    apply (insert_chain y (x :: xs) ys (delete_chain x xs ys r3)).
-Defined.
-*)
