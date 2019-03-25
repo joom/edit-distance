@@ -1,30 +1,75 @@
-#include <stdio.h>
-#include <string.h>
+// https://github.com/wooorm/levenshtein.c
+// (The MIT License)
+// Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>
+#include <stddef.h>
+#include <stdint.h>
 
-#define MIN3(a, b, c) ((a) < (b) ? ((a) < (c) ? (a) : (c)) : ((b) < (c) ? (b) : (c)))
-
-// O(min(m,n))
-int levenshtein(char *s1, char *s2) {
-    unsigned int s1len, s2len, x, y, lastdiag, olddiag;
-    s1len = strlen(s1);
-    s2len = strlen(s2);
-    unsigned int column[s1len+1];
-    for (y = 1; y <= s1len; y++)
-        column[y] = y;
-    for (x = 1; x <= s2len; x++) {
-        column[0] = x;
-        for (y = 1, lastdiag = x-1; y <= s1len; y++) {
-            olddiag = column[y];
-            column[y] = MIN3(column[y] + 1, column[y-1] + 1, lastdiag + (s1[y-1] == s2[x-1] ? 0 : 1));
-            lastdiag = olddiag;
-        }
-    }
-    return(column[s1len]);
+size_t strlen(const char *str) {
+  size_t i;
+  for (i=0; ; i++)
+    if (str[i]==0) return i;
 }
 
-int main(void) {
-  const char *s1 = "appel";
-  const char *s2 = "snapple";
-  printf("distance between `%s' and `%s': %d\n", s1, s2, levenshtein(s1, s2));
-  return 0;
+// Returns a size_t, depicting the difference between `a` and `b`.
+// See <http://en.wikipedia.org/wiki/Levenshtein_distance> for more information.
+size_t
+levenshtein_n(const char *a, const size_t length, const char *b, const size_t bLength) {
+  size_t *cache = calloc(length, sizeof(size_t));
+  size_t index = 0;
+  size_t bIndex = 0;
+  size_t distance;
+  size_t bDistance;
+  size_t result;
+  char code;
+
+  // Shortcut optimizations / degenerate cases.
+  if (a == b) {
+    return 0;
+  }
+
+  if (length == 0) {
+    return bLength;
+  }
+
+  if (bLength == 0) {
+    return length;
+  }
+
+  // initialize the vector.
+  while (index < length) {
+    cache[index] = index + 1;
+    index++;
+  }
+
+  // Loop.
+  while (bIndex < bLength) {
+    code = b[bIndex];
+    result = distance = bIndex++;
+    index = SIZE_MAX;
+
+    while (++index < length) {
+      bDistance = code == a[index] ? distance : distance + 1;
+      distance = cache[index];
+
+      cache[index] = result = distance > result
+        ? bDistance > result
+          ? result + 1
+          : bDistance
+        : bDistance > distance
+          ? distance + 1
+          : bDistance;
+    }
+  }
+
+  free(cache);
+
+  return result;
+}
+
+size_t
+levenshtein(const char *a, const char *b) {
+  const size_t length = strlen(a);
+  const size_t bLength = strlen(b);
+
+  return levenshtein_n(a, length, b, bLength);
 }

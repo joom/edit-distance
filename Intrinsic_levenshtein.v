@@ -163,39 +163,52 @@ destruct (Nat.leb (f x) (f y)) eqn:leb1.
     omega.
 Qed.
 
-Fixpoint levenshtein (s : string)  :=
-  fix levenshtein1 (t : string) : nat :=
-    match s as s', t as t' return nat with
-    | "" , "" => 0
-    | "" , _ => length t
-    | _ , "" => length s
+Fixpoint levenshtein_chain (s : string)  :=
+  fix levenshtein_chain1 (t : string) : {n : nat & chain s t n} :=
+    (match s as s', t as t' return s = s' -> t = t' -> {n : nat & chain s t n} with
+    | "" , "" =>
+        fun eq1 eq2 => existT _ 0 (aux_both_empty s t eq1 eq2)
+    | "" , _ =>
+        fun eq1 eq2 =>
+          existT _ (length t)
+            ltac:(rewrite eq1; apply (inserts_chain_empty t))
+    | y :: ys , "" =>
+        fun eq1 eq2 =>
+          existT _ (length s)
+            ltac:(rewrite eq1, eq2; apply (deletes_chain_empty (y :: ys)))
     | x :: xs, y :: ys =>
+      fun eq1 eq2 =>
         match ascii_dec x y with
-        | left ceq => levenshtein xs ys
+        | left ceq =>
+          let (n, c) := levenshtein_chain xs ys in
+          existT _ n (aux_eq_char s t x xs y ys n eq1 eq2 ceq c)
         | right neq =>
-          let n1 := levenshtein1 ys in
-          let n2 := levenshtein xs (y :: ys) in
-          let n3 := levenshtein xs ys in
-          S (min3_app n1 n2 n3 (fun n => n))
+          let (n1, r1) := levenshtein_chain1 ys in
+          let (n2, r2) := levenshtein_chain xs (y :: ys) in
+          let (n3, r3) := levenshtein_chain xs ys in
+          let r1' : chain s t (S n1) :=
+              aux_insert s t x xs y ys n1 eq1 eq2 r1 in
+          let r2' : chain s t (S n2) :=
+              aux_delete s t x xs y ys n2 eq1 eq2 r2 in
+              (* ltac:(rewrite eq1, eq2; *)
+              (*       apply (delete_chain x xs (y :: ys) r2)) in *)
+          let r3' : chain s t (S n3) :=
+              aux_update s t x xs y ys n3 neq eq1 eq2 r3 in
+              (* ltac:(rewrite eq1, eq2; *)
+              (*       apply (update_chain x y xs ys r3)) in *)
+          min3_app (existT (fun (n : nat) => chain s t n) (S n1) r1')
+                   (existT _ (S n2) r2')
+                   (existT _ (S n3) r3')
+                   (fun p => projT1 p)
         end
-    end.
+    end) (eq_refl s) (eq_refl t).
 
-Eval compute in (levenshtein "Appel" "apple").
-Eval compute in (levenshtein "pascal" "haskell").
-Eval compute in (levenshtein "ap" "app").
+Eval compute in (levenshtein_chain "Appel" "apple").
+Eval compute in (projT1 (levenshtein_chain "Appel" "apple")).
+Eval compute in (levenshtein_chain "pascal" "haskell").
+Eval compute in (projT1 (levenshtein_chain "pascal" "haskell")).
 
-Fixpoint levenshtein_is_chain (s t : string) : {n : nat & chain s t n}.
-induction s as [|x xs], t as [|y ys].
-* exists 0. constructor.
-* exists (length (y :: ys)).
-  apply inserts_chain_empty.
-* exists (length (x :: xs)).
-  apply deletes_chain_empty.
-*
-
-
-
-
+Eval compute in (levenshtein_chain "ap" "ma").
 
 Lemma chain_add_last_edit : forall s x xs n,
     chain s xs n -> chain s (xs ++ [x]) (S n).
@@ -377,8 +390,8 @@ destruct s as [|x xs] eqn:s_eq, t as [|y ys] eqn:t_eq.
 * apply deletes_chain_empty_min; auto.
 * simpl.
   destruct (ascii_dec x y) as [eq | neq].
-  - pose (IH := min_chain xs ys n).
-    rewrite <- (levenshtein_chain_same_first_chars x y xs ys eq) in IH.
+  - pose (IH := min_chain (x :: xs) (y :: ys) n c).
+    rewrite -> (levenshtein_chain_same_first_chars x y xs ys eq) in IH.
     destruct (levenshtein_chain xs ys) as [n' c'] eqn:c_eq.
     auto.
   -
