@@ -36,7 +36,6 @@ Proof.
   auto.
 
   simpl in |- *.
-  Search (_ = _ ++ "").
   apply app_empty_end; auto.
 
   intro y.

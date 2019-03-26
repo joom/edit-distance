@@ -3,7 +3,7 @@ From compcert Require Import Coqlib Integers Floats AST Ctypes Cop Clight Clight
 Local Open Scope Z_scope.
 
 Module Info.
-  Definition version := "3.4"%string.
+  Definition version := "3.5"%string.
   Definition build_number := ""%string.
   Definition build_tag := ""%string.
   Definition arch := "x86"%string.
@@ -12,7 +12,7 @@ Module Info.
   Definition bitsize := 32.
   Definition big_endian := false.
   Definition source_file := "levenshtein.c"%string.
-  Definition normalized := false.
+  Definition normalized := true.
 End Info.
 
 Definition ___builtin_annot : ident := 7%positive.
@@ -86,6 +86,8 @@ Definition _result : ident := 66%positive.
 Definition _str : ident := 52%positive.
 Definition _strlen : ident := 54%positive.
 Definition _t'1 : ident := 71%positive.
+Definition _t'10 : ident := 80%positive.
+Definition _t'11 : ident := 81%positive.
 Definition _t'2 : ident := 72%positive.
 Definition _t'3 : ident := 73%positive.
 Definition _t'4 : ident := 74%positive.
@@ -100,20 +102,22 @@ Definition f_strlen := {|
   fn_callconv := cc_default;
   fn_params := ((_str, (tptr tschar)) :: nil);
   fn_vars := nil;
-  fn_temps := ((_i, tuint) :: nil);
+  fn_temps := ((_i, tuint) :: (_t'1, tschar) :: nil);
   fn_body :=
 (Ssequence
   (Sset _i (Econst_int (Int.repr 0) tint))
   (Sloop
     (Ssequence
       Sskip
-      (Sifthenelse (Ebinop Oeq
-                     (Ederef
-                       (Ebinop Oadd (Etempvar _str (tptr tschar))
-                         (Etempvar _i tuint) (tptr tschar)) tschar)
-                     (Econst_int (Int.repr 0) tint) tint)
-        (Sreturn (Some (Etempvar _i tuint)))
-        Sskip))
+      (Ssequence
+        (Sset _t'1
+          (Ederef
+            (Ebinop Oadd (Etempvar _str (tptr tschar)) (Etempvar _i tuint)
+              (tptr tschar)) tschar))
+        (Sifthenelse (Ebinop Oeq (Etempvar _t'1 tschar)
+                       (Econst_int (Int.repr 0) tint) tint)
+          (Sreturn (Some (Etempvar _i tuint)))
+          Sskip)))
     (Sset _i
       (Ebinop Oadd (Etempvar _i tuint) (Econst_int (Int.repr 1) tint) tuint))))
 |}.
@@ -129,7 +133,8 @@ Definition f_levenshtein_n := {|
                (_bDistance, tuint) :: (_result, tuint) :: (_code, tschar) ::
                (_t'9, tuint) :: (_t'8, tuint) :: (_t'7, tuint) ::
                (_t'6, tuint) :: (_t'5, tuint) :: (_t'4, tuint) ::
-               (_t'3, tuint) :: (_t'2, tuint) :: (_t'1, tint) :: nil);
+               (_t'3, tuint) :: (_t'2, tuint) :: (_t'1, tint) ::
+               (_t'11, tschar) :: (_t'10, tschar) :: nil);
   fn_body :=
 (Ssequence
   (Ssequence
@@ -176,12 +181,12 @@ Definition f_levenshtein_n := {|
                   (Ebinop Olt (Etempvar _bIndex tuint)
                     (Etempvar _bLength tuint) tint)
                   (Ssequence
-                    (Sset _code
-                      (Ecast
+                    (Ssequence
+                      (Sset _t'11
                         (Ederef
                           (Ebinop Oadd (Etempvar _b (tptr tschar))
-                            (Etempvar _bIndex tuint) (tptr tschar)) tschar)
-                        tschar))
+                            (Etempvar _bIndex tuint) (tptr tschar)) tschar))
+                      (Sset _code (Ecast (Etempvar _t'11 tschar) tschar)))
                     (Ssequence
                       (Ssequence
                         (Ssequence
@@ -212,21 +217,26 @@ Definition f_levenshtein_n := {|
                                 Sbreak))
                             (Ssequence
                               (Ssequence
-                                (Sifthenelse (Ebinop Oeq
-                                               (Etempvar _code tschar)
-                                               (Ederef
-                                                 (Ebinop Oadd
-                                                   (Etempvar _a (tptr tschar))
-                                                   (Etempvar _index tuint)
-                                                   (tptr tschar)) tschar)
-                                               tint)
-                                  (Sset _t'5
-                                    (Ecast (Etempvar _distance tuint) tuint))
-                                  (Sset _t'5
-                                    (Ecast
-                                      (Ebinop Oadd (Etempvar _distance tuint)
-                                        (Econst_int (Int.repr 1) tint) tuint)
-                                      tuint)))
+                                (Ssequence
+                                  (Sset _t'10
+                                    (Ederef
+                                      (Ebinop Oadd
+                                        (Etempvar _a (tptr tschar))
+                                        (Etempvar _index tuint)
+                                        (tptr tschar)) tschar))
+                                  (Sifthenelse (Ebinop Oeq
+                                                 (Etempvar _code tschar)
+                                                 (Etempvar _t'10 tschar)
+                                                 tint)
+                                    (Sset _t'5
+                                      (Ecast (Etempvar _distance tuint)
+                                        tuint))
+                                    (Sset _t'5
+                                      (Ecast
+                                        (Ebinop Oadd
+                                          (Etempvar _distance tuint)
+                                          (Econst_int (Int.repr 1) tint)
+                                          tuint) tuint))))
                                 (Sset _bDistance (Etempvar _t'5 tuint)))
                               (Ssequence
                                 (Sset _distance
