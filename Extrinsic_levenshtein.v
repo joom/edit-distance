@@ -5,15 +5,80 @@ Require Import Omega.
 Require Import Coq.Program.Equality.
 
 Require Import StringFacts.
+Require Import Lemmas.
 
 Open Scope string_scope.
 
+Definition min3_app {t : Type} (x y z : t) (f : t -> nat) : t :=
+  let n1 := f x in let n2 := f y in let n3 := f z in
+  match (Nat.leb n1 n2) with
+  | true => match (Nat.leb n1 n3) with | true => x | false => z end
+  | false => match (Nat.leb n2 n3) with | true => y | false => z end
+  end.
+
+Fixpoint levenshtein (s : string)  :=
+  fix levenshtein1 (t : string) : nat :=
+    match s as s', t as t' return nat with
+    | "" , "" => 0
+    | "" , _ => length t
+    | _ , "" => length s
+    | x :: xs, y :: ys =>
+        match ascii_dec x y with
+        | left ceq => levenshtein xs ys
+        | right neq =>
+          let n1 := levenshtein1 ys in
+          let n2 := levenshtein xs (y :: ys) in
+          let n3 := levenshtein xs ys in
+          S (min3_app n1 n2 n3 (fun n => n))
+        end
+    end.
+
+(* Eval compute in (levenshtein "appel" "apple"). *)
+(* Eval compute in (levenshtein "pascal" "haskell"). *)
+
+(* Proofs *)
+
+Lemma leb_false : forall n m, (n <=? m) = false -> (m <? n) = true.
+intros n m H.
+rewrite Nat.leb_antisym in *.
+assert (eq : forall b, negb b = false -> b = true).
+  intros; destruct b; auto.
+exact (eq _ H).
+Qed.
+
+Lemma min3_app_pf {t : Type} (x y z : t) (f : t -> nat) :
+     f (min3_app x y z f) <= f x
+  /\ f (min3_app x y z f) <= f y
+  /\ f (min3_app x y z f) <= f z.
+Proof.
+unfold min3_app.
+destruct (Nat.leb (f x) (f y)) eqn:leb1.
+* destruct (Nat.leb (f x) (f z)) eqn:leb2.
+  - rewrite (Nat.leb_le (f x) (f y)) in *.
+    rewrite (Nat.leb_le (f x) (f z)) in *.
+    auto.
+  - rewrite (Nat.leb_le (f x) (f y)) in *.
+    pose ((proj1 (Nat.ltb_lt (f z) (f x))) (leb_false _ _ leb2)).
+    omega.
+* destruct (Nat.leb (f y) (f z)) eqn:leb3.
+  - rewrite (Nat.leb_le (f y) (f z)) in *.
+    pose ((proj1 (Nat.ltb_lt (f y) (f x))) (leb_false _ _ leb1)).
+    omega.
+  - pose ((proj1 (Nat.ltb_lt (f z) (f y))) (leb_false _ _ leb3)).
+    pose ((proj1 (Nat.ltb_lt (f y) (f x))) (leb_false _ _ leb1)).
+    omega.
+Qed.
+
+(* [edit s t] should be read as
+   "there is a edit from the string [s] to [t]" *)
 Inductive edit : string -> string -> Type :=
 | insertion (a : ascii) {s : string} : edit s (a :: s)
 | deletion (a : ascii) {s : string} : edit (a :: s) s
 | update (a' : ascii) (a : ascii)
          {neq : a' <> a} {s : string} : edit (a' :: s) (a :: s).
 
+(* [chain s t n] should be read as
+   "there is a way to go from the string [s] to [t] in [n] edits" *)
 Inductive chain : string -> string -> nat -> Type :=
 | empty : chain "" "" 0
 | skip {a : ascii} {s t : string} {n : nat} :
@@ -35,11 +100,6 @@ intros.
 induction s1; simpl.
 induction s2; constructor; auto.
 apply insert_chain; auto.
-Defined.
-
-(* transparent string version of app_nil_r *)
-Lemma tr_app_empty_r : forall {A : Type} (l : string), l ++ "" = l.
-intros A l; induction l. auto. simpl; rewrite IHl; auto.
 Defined.
 
 Lemma inserts_chain_empty : forall s, chain "" s (length s).
@@ -92,8 +152,6 @@ Defined.
 (*   - *)
 (* Abort. *)
 
-(* These aux lemmas are needed because Coq wants to use the fixpoint
-   we are defining as a higher order function otherwise. *)
 Lemma aux_insert : forall s t x xs y ys n,
     s = x :: xs -> t = y :: ys -> chain s ys n -> chain s t (S n).
 intros s t x xs y ys n eq1 eq2 r1.
@@ -125,84 +183,6 @@ Lemma aux_both_empty : forall s t, s = "" -> t = "" -> chain s t 0.
 intros s t eq1 eq2. subst. constructor.
 Defined.
 
-Lemma leb_false : forall n m, (n <=? m) = false -> (m <? n) = true.
-intros n m H.
-rewrite Nat.leb_antisym in *.
-assert (eq : forall b, negb b = false -> b = true).
-  intros; destruct b; auto.
-exact (eq _ H).
-Qed.
-
-Definition min3_app {t : Type} (x y z : t) (f : t -> nat) : t :=
-  let n1 := f x in let n2 := f y in let n3 := f z in
-  match (Nat.leb n1 n2) with
-  | true => match (Nat.leb n1 n3) with | true => x | false => z end
-  | false => match (Nat.leb n2 n3) with | true => y | false => z end
-  end.
-
-Lemma min3_app_pf {t : Type} (x y z : t) (f : t -> nat) :
-     f (min3_app x y z f) <= f x
-  /\ f (min3_app x y z f) <= f y
-  /\ f (min3_app x y z f) <= f z.
-Proof.
-unfold min3_app.
-destruct (Nat.leb (f x) (f y)) eqn:leb1.
-* destruct (Nat.leb (f x) (f z)) eqn:leb2.
-  - rewrite (Nat.leb_le (f x) (f y)) in *.
-    rewrite (Nat.leb_le (f x) (f z)) in *.
-    auto.
-  - rewrite (Nat.leb_le (f x) (f y)) in *.
-    pose ((proj1 (Nat.ltb_lt (f z) (f x))) (leb_false _ _ leb2)).
-    omega.
-* destruct (Nat.leb (f y) (f z)) eqn:leb3.
-  - rewrite (Nat.leb_le (f y) (f z)) in *.
-    pose ((proj1 (Nat.ltb_lt (f y) (f x))) (leb_false _ _ leb1)).
-    omega.
-  - pose ((proj1 (Nat.ltb_lt (f z) (f y))) (leb_false _ _ leb3)).
-    pose ((proj1 (Nat.ltb_lt (f y) (f x))) (leb_false _ _ leb1)).
-    omega.
-Qed.
-
-Fixpoint levenshtein (s : string)  :=
-  fix levenshtein1 (t : string) : nat :=
-    match s as s', t as t' return nat with
-    | "" , "" => 0
-    | "" , _ => length t
-    | _ , "" => length s
-    | x :: xs, y :: ys =>
-        match ascii_dec x y with
-        | left ceq => levenshtein xs ys
-        | right neq =>
-          let n1 := levenshtein1 ys in
-          let n2 := levenshtein xs (y :: ys) in
-          let n3 := levenshtein xs ys in
-          S (min3_app n1 n2 n3 (fun n => n))
-        end
-    end.
-
-Eval compute in (levenshtein "Appel" "apple").
-Eval compute in (levenshtein "pascal" "haskell").
-Eval compute in (levenshtein "ap" "app").
-
-Fixpoint levenshtein_is_chain (s : string) : forall (t : string),
-    chain s t (levenshtein s t).
-refine (fix levenshtein_is_chain1 (t : string) := _).
-case s as [|x xs], t as [|y ys].
-* constructor.
-* apply inserts_chain_empty.
-* apply deletes_chain_empty.
-* simpl. destruct (ascii_dec x y).
-  - subst. pose (levenshtein_is_chain xs ys).
-    apply skip. auto.
-  - pose (c1 := levenshtein_is_chain1 ys).
-    Check aux_insert.
-    pose (c2 := levenshtein_is_chain xs (y :: ys)).
-    pose (c3 := levenshtein_is_chain xs ys).
-Admitted.
-
-
-
-
 Lemma chain_add_last_edit : forall s x xs n,
     chain s xs n -> chain s (xs ++ [x]) (S n).
 intros s x xs n c.
@@ -212,42 +192,12 @@ induction c.
 * apply (change e IHc).
 Defined.
 
-Section TransparentLemmas.
-Lemma plus_n_O' : forall n:nat, n = n + 0.
-intros n. induction n.
-* auto.
-* simpl. rewrite <- IHn. auto.
-Defined.
-
-(* for some reason Coq still uses the opaque version in the defn *)
-Lemma plus_n_Sm' : forall n m : nat, S (m + n) = m + S n.
-intros n m. induction m.
-* simpl. reflexivity.
-* simpl. rewrite IHm. auto.
-Defined.
-
-Lemma app_empty_end' : forall s : string, s = s ++ "".
-intros s. induction s.
-* auto.
-* simpl. f_equal. auto.
-Defined.
-
-Lemma rev_length_same : forall s, length (rev s) = length s.
-intro s. induction s.
-* simpl; reflexivity.
-* simpl.
-  rewrite length_app_last.
-  rewrite IHs.
-  reflexivity.
-Defined.
-End TransparentLemmas.
-
 Fixpoint chain_append_end (s t u : string) : forall n,
     chain s t n -> chain s (t ++ u) (n + length u).
 intros n c.
 destruct u as [|x xs].
 * rewrite <- plus_n_O'.
-  rewrite <- app_empty_end'.
+  rewrite <- app_empty_end.
   auto.
 * pose (c' := chain_add_last_edit s x t n c).
   pose (c'' := chain_append_end s (t ++ [x]) xs _ c').
@@ -258,11 +208,6 @@ destruct u as [|x xs].
   rewrite <- eq.
   auto.
 Defined.
-
-(* Eval compute in (chain_append_end "" "abc" "def" 3 *)
-(*                    (projT2 (levenshtein_chain "" "abc"))). *)
-(* Eval compute in (levenshtein_chain "cd" "ce"). *)
-(* Eval compute in (levenshtein_chain "abcd" "ce"). *)
 
 Fixpoint chain_append_front' (s t u : string) {struct u} : forall n,
     chain s t n -> chain (rev u ++ s) t (length u + n).
@@ -350,3 +295,22 @@ dependent induction s.
   pose (le := IHs m' c').
   omega.
 Qed.
+
+Fixpoint levenshtein_is_chain (s : string) : forall (t : string),
+    chain s t (levenshtein s t).
+refine (fix levenshtein_is_chain1 (t : string) := _).
+case s as [|x xs], t as [|y ys].
+* constructor.
+* apply inserts_chain_empty.
+* apply deletes_chain_empty.
+* simpl. destruct (ascii_dec x y).
+  - subst. pose (levenshtein_is_chain xs ys).
+    apply skip. auto.
+  - pose (c1 := levenshtein_is_chain1 ys).
+    Check aux_insert.
+    pose (c2 := levenshtein_is_chain xs (y :: ys)).
+    pose (c3 := levenshtein_is_chain xs ys).
+Admitted.
+
+Theorem min_chain (s t : string) : forall (n : nat), chain s t n -> levenshtein s t <= n.
+Admitted.

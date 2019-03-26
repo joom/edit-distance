@@ -13,14 +13,14 @@ Theorem app_empty_end : forall (s : string), s = s ++ "".
 Proof.
   induction s; simpl in |- *; auto.
   rewrite <- IHs; auto.
-Qed.
+Defined.
 
 Theorem app_ass : forall l m n:string, (l ++ m) ++ n = l ++ m ++ n.
 Proof.
   intros. induction l; simpl in |- *; auto.
   now_show (a :: (l ++ m) ++ n = a :: l ++ m ++ n).
   rewrite <- IHl; auto.
-Qed.
+Defined.
 
 Fixpoint rev (s: string) : string :=
   match s with
@@ -42,13 +42,13 @@ Proof.
   simpl in |- *.
   rewrite (IHl y).
   apply (app_ass (rev y) (rev l) [a]).
-Qed.
+Defined.
 
 Remark rev_unit : forall (l:string) (a:ascii), rev (l ++ [a]) = a :: rev l.
 Proof.
   intros.
   apply (distr_rev l [a]); simpl in |- *; auto.
-Qed.
+Defined.
 
 Lemma rev_involutive : forall l:string, rev (rev l) = l.
 Proof.
@@ -58,7 +58,7 @@ Proof.
   simpl in |- *.
   rewrite (rev_unit (rev l) a).
   rewrite IHl; auto.
-Qed.
+Defined.
 
 Unset Implicit Arguments.
 Lemma rev_string_ind :
@@ -68,7 +68,7 @@ Lemma rev_string_ind :
     forall l:string, P (rev l).
 Proof.
   induction l; auto.
-Qed.
+Defined.
 
 Lemma rev_string_rec :
   forall P:string-> Set,
@@ -95,7 +95,7 @@ Proof.
   intros.
   apply (H0 a (rev l0)).
   auto.
-Qed.
+Defined.
 
 Theorem rev_rec :
   forall P:string -> Set,
@@ -120,7 +120,7 @@ intros x xs.
 induction xs.
 * auto.
 * simpl. f_equal. auto.
-Qed.
+Defined.
 
 Fixpoint firstn (n:nat)(l:string) : string :=
   match n with
@@ -140,7 +140,6 @@ Fixpoint skipn (n:nat)(l:string) : string :=
               end
   end.
 
-
 Ltac now_show c := change c in |- *.
 
 Theorem app_ass' : forall l m n:string, (l ++ m) ++ n = l ++ m ++ n.
@@ -148,4 +147,17 @@ Proof.
 intros. induction l; simpl in |- *; auto.
 now_show (a :: (l ++ m) ++ n = a :: l ++ m ++ n).
 rewrite <- IHl; auto.
+Defined.
+
+Lemma tr_app_empty_r : forall {A : Type} (l : string), l ++ "" = l.
+intros A l; induction l. auto. simpl; rewrite IHl; auto.
+Defined.
+
+Lemma rev_length_same : forall s, length (rev s) = length s.
+intro s. induction s.
+* simpl; reflexivity.
+* simpl.
+  rewrite length_app_last.
+  rewrite IHs.
+  reflexivity.
 Defined.
