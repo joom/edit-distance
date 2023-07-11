@@ -1,7 +1,7 @@
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
-Require Import Coq.Init.Peano.
-Require Import Omega.
+Require Import Nat.
+Require Import Lia.
 Require Import Coq.Program.Equality.
 
 Require Import StringFacts.
@@ -22,115 +22,118 @@ Inductive chain : string -> string -> nat -> Type :=
     edit s t -> chain t u n -> chain s u (S n).
 
 Lemma same_chain : forall s, chain s s 0.
-intros s. induction s; constructor; auto.
+Proof.
+  intros s. induction s; constructor; auto.
 Defined.
 
+Lemma chain_is_same : forall s t, chain s t 0 -> s = t.
+Proof.
+  intros s t c. dependent induction c.
+  auto. f_equal. auto.
+Qed.
+
 Lemma insert_chain : forall c s1 s2 n, chain s1 s2 n -> chain s1 (c :: s2) (S n).
-intros c s1 s2 n C.
-apply (@change _ (c :: s1)); constructor. auto.
+Proof.
+  intros c s1 s2 n C.
+  apply (@change _ (c :: s1)); constructor. auto.
 Defined.
 
 Lemma inserts_chain : forall s1 s2, chain s2 (s1 ++ s2) (length s1).
-intros.
-induction s1; simpl.
-induction s2; constructor; auto.
-apply insert_chain; auto.
+Proof.
+  intros.
+  induction s1; simpl.
+  induction s2; constructor; auto.
+  apply insert_chain; auto.
 Defined.
 
 (* transparent string version of app_nil_r *)
 Lemma tr_app_empty_r : forall {A : Type} (l : string), l ++ "" = l.
-intros A l; induction l. auto. simpl; rewrite IHl; auto.
+Proof.
+  intros A l; induction l. auto. simpl; rewrite IHl; auto.
 Defined.
 
 Lemma inserts_chain_empty : forall s, chain "" s (length s).
-intros s.
-induction s; simpl.
-constructor.
-apply insert_chain. auto.
+Proof.
+  intros s.
+  induction s; simpl.
+  constructor.
+  apply insert_chain. auto.
 Defined.
 
 Lemma delete_chain : forall c s1 s2 n, chain s1 s2 n -> chain (c :: s1) s2 (S n).
-intros c s1 s2 n C.
-apply (@change _ s1). constructor. auto.
+Proof.
+  intros c s1 s2 n C.
+  apply (@change _ s1). constructor. auto.
 Defined.
 
 Lemma deletes_chain : forall s1 s2, chain (s1 ++ s2) s2 (length s1).
-intros.
-induction s1; simpl.
-apply same_chain.
-apply delete_chain.
-auto.
+Proof.
+  intros.
+  induction s1; simpl.
+  apply same_chain.
+  apply delete_chain.
+  auto.
 Defined.
 
 Lemma deletes_chain_empty : forall s, chain s "" (length s).
-intros s.
-induction s; simpl.
-constructor. apply delete_chain. auto.
+Proof.
+  intros s.
+  induction s; simpl.
+  constructor. apply delete_chain. auto.
 Defined.
 
 Lemma update_chain : forall c c' s1 s2 n,
     c <> c' -> chain s1 s2 n -> chain (c :: s1) (c' :: s2) (S n).
-intros c c' s1 s2 n neq C.
-apply (@change _ (c' :: s1)). constructor. auto. apply skip. auto.
+Proof.
+  intros c c' s1 s2 n neq C.
+  apply (@change _ (c' :: s1)). constructor. auto. apply skip. auto.
 Defined.
-
-(* Lemma chain_trans : forall s t u, chain s t -> chain t u -> chain s u. *)
-(* intros s t u c1 c2. *)
-(* induction c2. *)
-(* * auto. *)
-(* * *)
-(* Abort. *)
-
-(* Lemma chain_reverse : forall s t, chain s t -> chain t s. *)
-(* intros s t c. *)
-(* induction c. *)
-(* * constructor. *)
-(* * constructor; auto. *)
-(* * induction e eqn:e_eq. *)
-(*   - admit. *)
-(*   - admit. *)
-(*   - *)
-(* Abort. *)
 
 (* These aux lemmas are needed because Coq wants to use the fixpoint
    we are defining as a higher order function otherwise. *)
 Lemma aux_insert : forall s t x xs y ys n,
     s = x :: xs -> t = y :: ys -> chain s ys n -> chain s t (S n).
-intros s t x xs y ys n eq1 eq2 r1.
-subst.
-apply (insert_chain y (x :: xs) ys n r1).
+Proof.
+  intros s t x xs y ys n eq1 eq2 r1.
+  subst.
+  apply (insert_chain y (x :: xs) ys n r1).
 Defined.
 
 Lemma aux_delete : forall s t x xs y ys n,
     s = x :: xs -> t = y :: ys -> chain xs (y :: ys) n -> chain s t (S n).
-intros s t x xs y ys n eq1 eq2 r2.
-subst.
-apply (delete_chain x xs (y :: ys) n r2).
+Proof.
+  intros s t x xs y ys n eq1 eq2 r2.
+  subst.
+  apply (delete_chain x xs (y :: ys) n r2).
 Defined.
 
 Lemma aux_update : forall s t x xs y ys n,
     x <> y -> s = x :: xs -> t = y :: ys -> chain xs ys n -> chain s t (S n).
-intros s t x xs y ys n neq eq1 eq2 r3.
-subst.
-apply (update_chain x y xs ys n neq r3).
+Proof.
+  intros s t x xs y ys n neq eq1 eq2 r3.
+  subst.
+  apply (update_chain x y xs ys n neq r3).
 Defined.
 
 Lemma aux_eq_char : forall s t x xs y ys n,
     s = x :: xs -> t = y :: ys -> x = y -> chain xs ys n -> chain s t n.
-intros s t x xs y ys n eq1 eq2 ceq C.
-subst. apply skip. auto.
+Proof.
+  intros s t x xs y ys n eq1 eq2 ceq C.
+  subst. apply skip. auto.
 Defined.
 
 Lemma aux_both_empty : forall s t, s = "" -> t = "" -> chain s t 0.
-intros s t eq1 eq2. subst. constructor.
+Proof.
+  intros s t eq1 eq2. subst. constructor.
 Defined.
 
-Lemma leb_false : forall n m, (n <=? m) = false -> (m <? n) = true.
-intros n m H.
-rewrite Nat.leb_antisym in *.
-assert (eq : forall b, negb b = false -> b = true).
-  intros; destruct b; auto.
-exact (eq _ H).
+Lemma leb_false : forall (n m : nat), (n <=? m)%nat = false -> (m <? n)%nat = true.
+Proof.
+  intros n m H.
+  rewrite PeanoNat.Nat.leb_antisym in *.
+  assert (eq : forall b, negb b = false -> b = true).
+    intros; destruct b; auto.
+  exact (eq _ H).
 Qed.
 
 Definition min3_app {t : Type} (x y z : t) (f : t -> nat) : t :=
@@ -141,26 +144,26 @@ Definition min3_app {t : Type} (x y z : t) (f : t -> nat) : t :=
   end.
 
 Lemma min3_app_pf {t : Type} (x y z : t) (f : t -> nat) :
-     f (min3_app x y z f) <= f x
+    (f (min3_app x y z f) <= f x
   /\ f (min3_app x y z f) <= f y
-  /\ f (min3_app x y z f) <= f z.
+  /\ f (min3_app x y z f) <= f z)%nat.
 Proof.
-unfold min3_app.
-destruct (Nat.leb (f x) (f y)) eqn:leb1.
-* destruct (Nat.leb (f x) (f z)) eqn:leb2.
-  - rewrite (Nat.leb_le (f x) (f y)) in *.
-    rewrite (Nat.leb_le (f x) (f z)) in *.
-    auto.
-  - rewrite (Nat.leb_le (f x) (f y)) in *.
-    pose ((proj1 (Nat.ltb_lt (f z) (f x))) (leb_false _ _ leb2)).
-    omega.
-* destruct (Nat.leb (f y) (f z)) eqn:leb3.
-  - rewrite (Nat.leb_le (f y) (f z)) in *.
-    pose ((proj1 (Nat.ltb_lt (f y) (f x))) (leb_false _ _ leb1)).
-    omega.
-  - pose ((proj1 (Nat.ltb_lt (f z) (f y))) (leb_false _ _ leb3)).
-    pose ((proj1 (Nat.ltb_lt (f y) (f x))) (leb_false _ _ leb1)).
-    omega.
+  unfold min3_app.
+  destruct (Nat.leb (f x) (f y)) eqn:leb1.
+  * destruct (Nat.leb (f x) (f z)) eqn:leb2.
+    - rewrite (PeanoNat.Nat.leb_le (f x) (f y)) in *.
+      rewrite (PeanoNat.Nat.leb_le (f x) (f z)) in *.
+      auto.
+    - rewrite (PeanoNat.Nat.leb_le (f x) (f y)) in *.
+      pose ((proj1 (PeanoNat.Nat.ltb_lt (f z) (f x))) (leb_false _ _ leb2)).
+      lia.
+  * destruct (Nat.leb (f y) (f z)) eqn:leb3.
+    - rewrite (PeanoNat.Nat.leb_le (f y) (f z)) in *.
+      pose ((proj1 (PeanoNat.Nat.ltb_lt (f y) (f x))) (leb_false _ _ leb1)).
+      lia.
+    - pose ((proj1 (PeanoNat.Nat.ltb_lt (f z) (f y))) (leb_false _ _ leb3)).
+      pose ((proj1 (PeanoNat.Nat.ltb_lt (f y) (f x))) (leb_false _ _ leb1)).
+      lia.
 Qed.
 
 Fixpoint levenshtein_chain (s : string)  :=
@@ -204,66 +207,68 @@ Fixpoint levenshtein_chain (s : string)  :=
     end) (eq_refl s) (eq_refl t).
 
 Eval compute in (levenshtein_chain "Appel" "apple").
-Eval compute in (projT1 (levenshtein_chain "Appel" "apple")).
 Eval compute in (levenshtein_chain "pascal" "haskell").
-Eval compute in (projT1 (levenshtein_chain "pascal" "haskell")).
 
-Eval compute in (levenshtein_chain "ap" "ma").
-
-Lemma chain_add_last_edit : forall s x xs n,
-    chain s xs n -> chain s (xs ++ [x]) (S n).
-intros s x xs n c.
-induction c.
-* simpl. eapply change. eapply insertion. apply same_chain.
-* simpl. apply skip. auto.
-* apply (change e IHc).
+Lemma chain_add_last_edit : forall s t x n,
+    chain s t n -> chain s (t ++ [x]) (S n).
+Proof.
+  intros s t x n c.
+  induction c.
+  * simpl. eapply change. eapply insertion. apply same_chain.
+  * simpl. apply skip. auto.
+  * apply (change e IHc).
 Defined.
 
 Section TransparentLemmas.
 Lemma plus_n_O' : forall n:nat, n = n + 0.
-intros n. induction n.
-* auto.
-* simpl. rewrite <- IHn. auto.
+Proof.
+  intros n. induction n.
+  * auto.
+  * simpl. rewrite <- IHn. auto.
 Defined.
 
 (* for some reason Coq still uses the opaque version in the defn *)
 Lemma plus_n_Sm' : forall n m : nat, S (m + n) = m + S n.
-intros n m. induction m.
-* simpl. reflexivity.
-* simpl. rewrite IHm. auto.
+Proof.
+  intros n m. induction m.
+  * simpl. reflexivity.
+  * simpl. rewrite IHm. auto.
 Defined.
 
 Lemma app_empty_end' : forall s : string, s = s ++ "".
-intros s. induction s.
-* auto.
-* simpl. f_equal. auto.
+Proof.
+  intros s. induction s.
+  * auto.
+  * simpl. f_equal. auto.
 Defined.
 
 Lemma rev_length_same : forall s, length (rev s) = length s.
-intro s. induction s.
-* simpl; reflexivity.
-* simpl.
-  rewrite length_app_last.
-  rewrite IHs.
-  reflexivity.
+Proof.
+  intro s. induction s.
+  * simpl; reflexivity.
+  * simpl.
+    rewrite length_app_last.
+    rewrite IHs.
+    reflexivity.
 Defined.
 End TransparentLemmas.
 
 Fixpoint chain_append_end (s t u : string) : forall n,
     chain s t n -> chain s (t ++ u) (n + length u).
-intros n c.
-destruct u as [|x xs].
-* rewrite <- plus_n_O'.
-  rewrite <- app_empty_end'.
-  auto.
-* pose (c' := chain_add_last_edit s x t n c).
-  pose (c'' := chain_append_end s (t ++ [x]) xs _ c').
-  rewrite app_ass' in c''.
-  simpl in *.
-  assert ((S (n + length xs)) = (n + S (length xs))) as eq.
-  rewrite plus_n_Sm'. auto.
-  rewrite <- eq.
-  auto.
+Proof.
+  intros n c.
+  destruct u as [|x xs].
+  * rewrite <- plus_n_O'.
+    rewrite <- app_empty_end'.
+    auto.
+  * pose (c' := chain_add_last_edit s t x n c).
+    pose (c'' := chain_append_end s (t ++ [x]) xs _ c').
+    rewrite app_ass' in c''.
+    simpl in *.
+    assert ((S (n + length xs)) = (n + S (length xs))) as eq.
+    rewrite plus_n_Sm'. auto.
+    rewrite <- eq.
+    auto.
 Defined.
 
 Eval compute in (chain_append_end "" "abc" "def" 3
@@ -273,33 +278,170 @@ Eval compute in (levenshtein_chain "abcd" "ce").
 
 Fixpoint chain_append_front' (s t u : string) {struct u} : forall n,
     chain s t n -> chain (rev u ++ s) t (length u + n).
-intros n c.
-induction u as [|x xs].
-* simpl. auto.
-* pose (c' := chain_append_front' (x :: s) t xs (S n) (change (deletion x) c)).
-  simpl in *. rewrite app_ass. simpl.
-  rewrite <- plus_n_Sm' in c'.
-  auto.
+Proof.
+  intros n c.
+  induction u as [|x xs].
+  * simpl. auto.
+  * pose (c' := chain_append_front' (x :: s) t xs (S n) (change (deletion x) c)).
+    simpl in *. rewrite app_ass. simpl.
+    rewrite <- plus_n_Sm' in c'.
+    auto.
 Defined.
 
 Definition chain_append_front (s t u : string) : forall n,
     chain s t n -> chain (u ++ s) t (length u + n).
-intros n c.
-pose (c' := chain_append_front' s t (rev u) n c).
-rewrite rev_length_same in c'.
-rewrite rev_involutive in c'.
-auto.
+Proof.
+  intros n c.
+  pose (c' := chain_append_front' s t (rev u) n c).
+  rewrite rev_length_same in c'.
+  rewrite rev_involutive in c'.
+  auto.
 Defined.
 
-Lemma chain_trans : forall s t u n m,
-    chain s t n -> chain t u m -> chain s u (n + m).
-intros s t u n m c1 c2.
-induction t.
-* dependent induction c1; simpl.
-  - auto.
-  - apply (change e). apply IHc1; auto.
-* dependent induction c2.
-Abort.
+Lemma reverse_edit : forall s t, edit s t -> edit t s.
+Proof.
+  intros s t e.
+  induction e; constructor; auto.
+Defined.
+
+Lemma apply_edit_at_end : forall s t u n,
+    chain s t n -> edit t u -> chain s u (S n).
+Proof.
+  intros s t u n c e.
+  dependent induction e; dependent induction c.
+  - apply inserts_chain_empty.
+  - apply (change (insertion _) (skip (skip c))).
+  - apply (change e (IHc _)).
+  - apply (change (deletion _) c).
+  - refine (change e (IHc a _ _)); auto.
+  - refine (change (update _ _) (skip c)); auto.
+  - refine (change e (IHc _ _ _ _ _)); auto.
+Defined.
+
+Lemma reverse_chain : forall s t n, chain s t n -> chain t s n.
+Proof.
+  intros s t n c.
+  dependent induction c.
+  * constructor.
+  * constructor; auto.
+  * eapply apply_edit_at_end. apply IHc. apply reverse_edit. auto.
+Defined.
+
+Lemma add_char_at_end_edit : forall s t a,
+    edit s t -> edit (s ++ [a]) (t ++ [a]).
+Proof.
+  intros s t a e.
+  dependent induction e; constructor; auto.
+Defined.
+
+Lemma add_char_at_end_chain : forall s t n a,
+    chain s t n -> chain (s ++ [a]) (t ++ [a]) n.
+Proof.
+  intros s t n a c.
+  dependent induction c.
+  * repeat constructor.
+  * constructor. auto.
+  * econstructor. eapply add_char_at_end_edit. eauto. auto.
+Defined.
+
+
+Lemma update_char_left_chain : forall s t n a a',
+    a' <> a -> chain (s ++ [a]) t n -> chain (s ++ [a']) t (S n).
+Proof.
+  intros s t n a a' neq c.
+  dependent induction c.
+  * simpl. dependent induction s; simpl in *; inversion x.
+  * dependent induction s; simpl in *; inversion x; subst.
+    eapply change. eapply update. apply neq.
+    apply skip. auto.
+    apply skip. apply (IHc s a1 neq eq_refl).
+  * admit.
+Admitted.
+
+Lemma add_char_left_chain : forall s t n a,
+    chain s t n -> chain (s ++ [a]) t (S n).
+Proof.
+  intros s t n a c.
+  dependent induction c.
+  * simpl. eapply change. apply deletion. constructor.
+  * simpl. constructor. auto.
+  * econstructor. eapply add_char_at_end_edit. eauto. auto.
+Defined.
+
+Lemma remove_char_left_chain : forall s t n a,
+    chain (s ++ [a]) t n -> chain s t (S n).
+Proof.
+  intros s t n a c.
+  dependent induction c.
+  * dependent induction s; simpl in *; inversion x.
+  * dependent induction s; simpl in *; inversion x; subst.
+    eapply apply_edit_at_end. apply c. apply insertion.
+    apply skip. apply (IHc s a1 eq_refl).
+  * dependent induction e.
+    simpl in *.
+    eapply change. eapply insertion. apply (IHc (a0 :: s) a eq_refl).
+    induction s; simpl in *; inversion x; subst.
+    eapply change. eapply (insertion " "). eapply change. eapply deletion. auto.
+    admit.
+    induction s; simpl in *; inversion x; subst.
+    eapply change. eapply (insertion a0). admit.
+
+    admit.
+
+Admitted.
+
+Lemma add_char_right_chain : forall s t n a,
+    chain s t n -> chain s (t ++ [a]) (S n).
+Proof.
+  intros s t n a c.
+  apply reverse_chain.
+  apply add_char_left_chain.
+  apply reverse_chain.
+  auto.
+Defined.
+
+Lemma empty_append : forall s t, append s t = "" -> s = "" /\ t = "".
+Proof.
+  intros s t pf.
+  induction s, t.
+  auto.
+  auto.
+  inversion pf.
+  inversion pf.
+Qed.
+
+Lemma empty_rev : forall s, rev s = "" -> s = "".
+Proof.
+  intros s pf. induction s.
+  auto.
+  simpl in *.
+  pose (p := empty_append (rev s) [a] pf).
+  destruct p as [p1 p2].
+  inversion p2.
+Qed.
+
+Lemma chain_rev : forall s t n,
+    chain s t n -> chain (rev s) (rev t) n.
+Proof.
+  intros s t n c.
+  dependent induction c.
+  * constructor.
+  * simpl. apply add_char_at_end_chain. auto.
+  * dependent induction e.
+    - apply (remove_char_left_chain _ _ _ _ IHc).
+    - simpl. apply add_char_left_chain. auto.
+    - simpl in *. eapply update_char_left_chain. apply neq. auto.
+Defined.
+
+(* Lemma chain_trans : forall s t u n m, *)
+(*   chain s t n -> chain t u m -> {x : nat & (chain s u x) * (x <= n + m)}%type. *)
+(* Proof. *)
+(* Abort *)
+
+(* Lemma chain_trans : forall s t u n m, *)
+(*   chain s t n -> chain t u m -> chain s u (n + m). *)
+(* Proof. *)
+(* Abort. *)
 
 Lemma chain_lengthen : forall s t m,
     chain "" s (length s) -> chain s t m -> chain "" t (length s + m).
@@ -313,6 +455,9 @@ Abort.
 Lemma chain_without_last_insert : forall l x n,
     chain "" (l ++ [x]) (S n) -> chain "" l n.
 intros l x n c.
+dependent induction c.
+induction e.
+
 Admitted.
 
 Lemma chain_without_first_delete : forall l x n,
@@ -342,7 +487,7 @@ refine (rev_ind (fun q => forall m (c' : chain "" q m), length q <= m)
   rewrite m_eq in *.
   pose (c'' := chain_without_last_insert _ _ _ c').
   pose (le := IH m' c'').
-  omega.
+  lia.
 Qed.
 
 Lemma deletes_chain_empty_min : forall s n (c : chain s "" n), length s <= n.
@@ -355,10 +500,9 @@ dependent induction s.
   rewrite m_eq in *.
   pose (c' := chain_without_first_delete _ _ _ c).
   pose (le := IHs m' c').
-  omega.
+  lia.
 Qed.
 
-Check projT1.
 Lemma projT1_eq : forall {A : Type} {P P' : A -> Type} (x x' : A) (pf : P x) (pf' : P' x'),
     x = x' ->
     projT1 (existT _ x pf) = projT1 (existT _ x' pf').
@@ -383,18 +527,39 @@ Fixpoint min_chain (s : string) :
   forall (t : string) (n : nat) (c : chain s t n),
     projT1 (levenshtein_chain s t) <= n.
 Proof.
-refine (fix min_chain1 (t : string) (n : nat) (c : chain s t n) := _).
-destruct s as [|x xs] eqn:s_eq, t as [|y ys] eqn:t_eq.
-* simpl. omega.
-* apply inserts_chain_empty_min; auto.
-* apply deletes_chain_empty_min; auto.
-* simpl.
-  destruct (ascii_dec x y) as [eq | neq].
-  - pose (IH := min_chain (x :: xs) (y :: ys) n c).
-    rewrite -> (levenshtein_chain_same_first_chars x y xs ys eq) in IH.
-    destruct (levenshtein_chain xs ys) as [n' c'] eqn:c_eq.
-    auto.
-  -
+  refine (fix min_chain1 (t : string) (n : nat) (c : chain s t n) := _).
+  destruct s as [|x xs] eqn:s_eq, t as [|y ys] eqn:t_eq.
+  * simpl. lia.
+  * apply inserts_chain_empty_min; auto.
+  * apply deletes_chain_empty_min; auto.
+  * simpl.
+    destruct (ascii_dec x y) as [eq | neq].
+    - pose (IH := min_chain (x :: xs) (y :: ys) n c).
+      rewrite -> (levenshtein_chain_same_first_chars x y xs ys eq) in IH.
+      destruct (levenshtein_chain xs ys) as [n' c'] eqn:c_eq.
+      auto.
+    -
 
 
-Abort.
+Admitted.
+
+
+(* If you want to use a more extrinsic interface: *)
+
+Definition levenshtein (s t : string) : nat :=
+  projT1 (levenshtein_chain s t).
+
+Theorem levenshtein_is_chain (s t : string) :
+  {n : nat & chain s t (levenshtein s t)}.
+Proof.
+  exists (levenshtein s t).
+  unfold levenshtein.
+  destruct (levenshtein_chain s t).
+  auto.
+Qed.
+
+Theorem levensthein_is_minimal (s t : string) :
+  forall (n : nat) (c : chain s t n), levenshtein s t <= n.
+Proof.
+  apply min_chain.
+Qed.

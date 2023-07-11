@@ -1,7 +1,6 @@
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Init.Peano.
-Require Import Omega.
 Require Import Coq.Program.Equality.
 
 Open Scope string_scope.
