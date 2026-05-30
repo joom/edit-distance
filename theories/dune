@@ -1,0 +1,5 @@
+(coq.theory
+ (name EditDistance)
+ (package rocq-edit-distance)
+ (synopsis "Verifying edit distance properties in Rocq")
+ (theories Stdlib Ltac2 Flocq compcert VST))

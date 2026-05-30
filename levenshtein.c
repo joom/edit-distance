@@ -1,8 +1,10 @@
 // https://github.com/wooorm/levenshtein.c
 // (The MIT License)
 // Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>
+// Slightly altered for the proof.
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 size_t strlen(const char *str) {
   size_t i;
@@ -14,7 +16,7 @@ size_t strlen(const char *str) {
 // See <http://en.wikipedia.org/wiki/Levenshtein_distance> for more information.
 size_t
 levenshtein_n(const char *a, const size_t length, const char *b, const size_t bLength) {
-  size_t *cache = calloc(length, sizeof(size_t));
+  size_t *cache;
   size_t index = 0;
   size_t bIndex = 0;
   size_t distance;
@@ -24,7 +26,7 @@ levenshtein_n(const char *a, const size_t length, const char *b, const size_t bL
 
   // Shortcut optimizations / degenerate cases.
   if (a == b) {
-    return 0;
+    return (size_t) 0;
   }
 
   if (length == 0) {
@@ -35,6 +37,8 @@ levenshtein_n(const char *a, const size_t length, const char *b, const size_t bL
     return length;
   }
 
+  cache = calloc(length, sizeof(size_t));
+
   // initialize the vector.
   while (index < length) {
     cache[index] = index + 1;
@@ -44,20 +48,35 @@ levenshtein_n(const char *a, const size_t length, const char *b, const size_t bL
   // Loop.
   while (bIndex < bLength) {
     code = b[bIndex];
-    result = distance = bIndex++;
-    index = SIZE_MAX;
+    distance = bIndex;
+    result = bIndex;
+    bIndex++;
+    index = 0;
 
-    while (++index < length) {
-      bDistance = code == a[index] ? distance : distance + 1;
+    while (index < length) {
+      if (code == a[index]) {
+        bDistance = distance;
+      } else {
+        bDistance = distance + 1;
+      }
       distance = cache[index];
 
-      cache[index] = result = distance > result
-        ? bDistance > result
-          ? result + 1
-          : bDistance
-        : bDistance > distance
-          ? distance + 1
-          : bDistance;
+      if (distance > result) {
+        if (bDistance > result) {
+          result = result + 1;
+        } else {
+          result = bDistance;
+        }
+      } else {
+        if (bDistance > distance) {
+          result = distance + 1;
+        } else {
+          result = bDistance;
+        }
+      }
+
+      cache[index] = result;
+      index++;
     }
   }
 
