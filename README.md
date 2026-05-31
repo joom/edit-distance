@@ -4,6 +4,8 @@ Formal verification of the Levenshtein (edit) distance in [Rocq](https://rocq-pr
 including a proof that a C implementation refines a verified functional model using the
 [Verified Software Toolchain](http://vst.cs.princeton.edu/) (VST).
 
+This proof development was carried out with assistance from Claude and Codex.
+
 The development is structured in three layers, each proved equivalent to the next:
 
 1. an **intrinsically-correct recursive** model, whose dependently-typed definition
